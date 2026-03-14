@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="メモ">
+<meta name="theme-color" content="#f5f5f0">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>MemoApp</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f5f5f0;
+  --bg2: #ffffff;
+  --bg3: #eeeee8;
+  --text: #1a1a1a;
+  --text2: #777;
+  --text3: #aaa;
+  --border: #e4e4de;
+  --accent: #1a1a1a;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bot: env(safe-area-inset-bottom, 0px);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  font-family: 'Noto Sans JP', sans-serif;
+  color: var(--text);
+  overflow: hidden;
+}
+
+/* ===== LAYOUT ===== */
+#app { display:flex; flex-direction:column; height:100vh; height:100dvh; }
+
+.screen { display:none; flex:1; flex-direction:column; overflow:hidden; }
+.screen.active { display:flex; }
+
+/* ===== NAV HEADER ===== */
+.nav-header {
+  padding: calc(var(--safe-top) + 54px) 20px 0;
+  background: var(--bg);
+}
+.nav-title { font-size:28px; font-weight:700; letter-spacing:-0.5px; }
+.nav-actions { position:absolute; right:20px; top:calc(var(--safe-top) + 56px); }
+.nav-actions button {
+  background:none; border:none; font-size:22px; color:var(--text); cursor:pointer; padding:4px;
+}
+
+/* ===== SEARCH ===== */
+.search-wrap { padding:10px 16px 0; }
+.search-bar {
+  display:flex; align-items:center; gap:8px;
+  background:var(--bg3); border-radius:12px; padding:9px 14px;
+  font-size:14px; color:var(--text3);
+}
+.search-bar input {
+  border:none; background:none; outline:none; flex:1;
+  font-size:14px; font-family:inherit; color:var(--text);
+}
+.search-bar input::placeholder { color:var(--text3); }
+
+/* ===== TAG CHIPS ===== */
+.tag-row {
+  display:flex; gap:8px; padding:10px 16px 4px;
+  overflow-x:auto; scrollbar-width:none;
+}
+.tag-row::-webkit-scrollbar { display:none; }
+.chip {
+  padding:5px 14px; border-radius:20px; font-size:12px; font-weight:500;
+  white-space:nowrap; cursor:pointer; border:none; font-family:inherit;
+  transition: all .15s;
+}
+.chip.on  { background:var(--text); color:var(--bg); }
+.chip.off { background:var(--bg3); color:var(--text2); }
+
+/* ===== SCROLL AREA ===== */
+.scroll { flex:1; overflow-y:auto; padding:8px 16px 120px; -webkit-overflow-scrolling:touch; }
+.scroll::-webkit-scrollbar { display:none; }
+
+/* ===== SECTION LABEL ===== */
+.sec-label {
+  font-size:11px; font-weight:600; color:var(--text3);
+  letter-spacing:.1em; text-transform:uppercase;
+  padding:12px 4px 6px;
+}
+
+/* ===== MEMO CARD ===== */
+.memo-card-wrap {
+  position:relative; margin-bottom:8px; border-radius:16px; overflow:hidden;
+}
+.memo-delete-bg {
+  position:absolute; inset:0; background:#e03030;
+  display:flex; align-items:center; justify-content:flex-end;
+  padding-right:20px; border-radius:16px;
+  font-size:13px; font-weight:600; color:#fff; pointer-events:none;
+}
+.memo-card {
+  background:var(--bg2); border-radius:16px; padding:14px 16px;
+  cursor:pointer;
+  border: 1.5px solid transparent;
+  position:relative; touch-action:pan-y; will-change:transform;
+}
+.memo-card.pinned { border-color: rgba(240,180,40,.5); }
+.memo-card-title { font-size:14px; font-weight:600; margin-bottom:4px; display:flex; align-items:center; gap:6px; }
+.memo-card-body  { font-size:12px; color:var(--text2); line-height:1.5;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.memo-card-footer{ display:flex; justify-content:space-between; align-items:center; margin-top:8px; }
+.memo-date { font-size:10px; color:var(--text3); }
+.tag-badge {
+  font-size:10px; font-weight:500; padding:2px 8px; border-radius:10px;
+}
+.tag-work  { background:#fff0e6; color:#d06010; }
+.tag-idea  { background:#e6f0ff; color:#2060c0; }
+.tag-life  { background:#e6ffe6; color:#208020; }
+.tag-other { background:#f0e6ff; color:#7030a0; }
+.pin-icon { font-size:11px; opacity:.7; transform:rotate(45deg); display:inline-block; }
+
+/* ===== TASK SCREEN ===== */
+.seg-wrap { padding:10px 20px 0; }
+.seg {
+  display:flex; background:var(--bg3); border-radius:12px; padding:3px; gap:3px;
+}
+.seg-btn {
+  flex:1; text-align:center; padding:7px 0; border-radius:9px;
+  font-size:13px; font-weight:500; cursor:pointer; border:none; font-family:inherit;
+  color:var(--text2); background:none; transition:all .2s;
+}
+.seg-btn.on { background:var(--bg2); color:var(--text); font-weight:600; box-shadow:0 1px 4px rgba(0,0,0,.1); }
+
+/* Goal Card */
+.goal-card {
+  border-radius:16px; padding:14px 16px; margin-bottom:4px;
+  color:#fff;
+}
+.goal-card.work { background: linear-gradient(135deg,#1a1a1a,#383848); }
+.goal-card.life { background: linear-gradient(135deg,#1a6645,#2a9060); }
+.goal-month { font-size:11px; font-weight:600; opacity:.5; letter-spacing:.06em; margin-bottom:6px; }
+.goal-items { font-size:13px; font-weight:500; line-height:1.7; }
+.goal-days  {
+  display:inline-flex; align-items:center; gap:4px;
+  margin-top:10px; padding:4px 10px; border-radius:8px;
+  background:rgba(255,255,255,.12); font-size:11px; opacity:.65;
+}
+
+/* Task row - swipe to delete */
+.task-row-wrap {
+  position:relative; margin-bottom:6px; border-radius:12px; overflow:hidden;
+}
+.task-delete-bg {
+  position:absolute; inset:0; background:#e03030;
+  display:flex; align-items:center; justify-content:flex-end;
+  padding-right:20px; border-radius:12px;
+  font-size:13px; font-weight:600; color:#fff; pointer-events:none;
+}
+.task-row {
+  display:flex; align-items:center; gap:12px;
+  background:var(--bg2); border-radius:12px; padding:11px 14px;
+  position:relative; touch-action:pan-y; will-change:transform;
+}
+.task-check {
+  width:22px; height:22px; border-radius:50%; border:1.5px solid var(--border);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; flex-shrink:0; transition:all .2s; background:none;
+}
+.task-check.done { background:var(--text); border-color:var(--text); }
+.task-check.done::after { content:'✓'; color:#fff; font-size:11px; font-weight:700; }
+.task-label { font-size:13px; flex:1; transition:all .2s; }
+.task-label.done { color:var(--text3); text-decoration:line-through; }
+
+/* ===== FAB ===== */
+.fab {
+  position:fixed; bottom:calc(82px + var(--safe-bot) + 16px); right:20px;
+  width:52px; height:52px; border-radius:50%;
+  background:var(--text); color:var(--bg);
+  display:flex; align-items:center; justify-content:center;
+  font-size:26px; font-weight:300; cursor:pointer; border:none;
+  box-shadow:0 4px 20px rgba(0,0,0,.25);
+  transition:transform .15s;
+  z-index:100;
+}
+.fab:active { transform:scale(.93); }
+
+/* ===== TAB BAR ===== */
+.tab-bar {
+  display:flex; background:rgba(245,245,240,.92);
+  backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+  border-top:1px solid var(--border);
+  padding-bottom: var(--safe-bot);
+  flex-shrink:0;
+}
+.tab-item {
+  flex:1; display:flex; flex-direction:column; align-items:center;
+  padding:10px 0 4px; cursor:pointer; border:none; background:none; font-family:inherit;
+}
+.tab-icon { font-size:22px; line-height:1; margin-bottom:2px; }
+.tab-label { font-size:9px; font-weight:500; letter-spacing:.03em; color:var(--text3); }
+.tab-item.on .tab-label { color:var(--text); }
+.tab-item:not(.on) .tab-icon { opacity:.28; }
+
+/* ===== EMPTY STATE ===== */
+.empty { text-align:center; padding:60px 20px; color:var(--text3); }
+.empty-icon { font-size:40px; margin-bottom:12px; }
+.empty-text { font-size:14px; }
+
+/* ===== MODAL / SHEET ===== */
+.overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.4);
+  z-index:200; display:none; align-items:flex-end;
+}
+.overlay.open { display:flex; animation:fadeIn .2s; }
+.sheet {
+  background:var(--bg2); border-radius:20px 20px 0 0;
+  width:100%; max-height:92vh; display:flex; flex-direction:column;
+  padding-bottom: var(--safe-bot);
+  animation: slideUp .25s ease-out;
+}
+@keyframes slideUp { from { transform:translateY(100%); } to { transform:translateY(0); } }
+@keyframes fadeIn  { from { opacity:0; } to { opacity:1; } }
+
+.sheet-handle {
+  width:36px; height:4px; background:var(--border);
+  border-radius:2px; margin:12px auto 0;
+}
+.sheet-header {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:14px 20px 10px;
+  font-size:16px; font-weight:700;
+}
+.sheet-cancel { font-size:14px; color:var(--text2); border:none; background:none; font-family:inherit; cursor:pointer; }
+.sheet-done   {
+  font-size:14px; font-weight:700; color:var(--text); border:none; background:none;
+  font-family:inherit; cursor:pointer;
+}
+.sheet-done:disabled { color:var(--text3); }
+.sheet-body { flex:1; overflow-y:auto; padding:0 20px 20px; }
+
+.field-label { font-size:12px; font-weight:600; color:var(--text2); margin:16px 0 6px; letter-spacing:.05em; }
+.field-input {
+  width:100%; border:none; border-bottom:1.5px solid var(--border);
+  padding:8px 0; font-size:16px; font-family:inherit; background:none;
+  outline:none; color:var(--text);
+}
+.field-input.title { font-size:20px; font-weight:700; }
+.field-textarea {
+  width:100%; border:none; padding:8px 0; font-size:15px;
+  font-family:inherit; background:none; outline:none; color:var(--text);
+  resize:none; min-height:120px; line-height:1.7;
+  border-bottom:1.5px solid var(--border);
+}
+
+.tags-grid { display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+
+/* seg in sheet */
+.sheet-seg { display:flex; gap:6px; margin-top:4px; }
+.sheet-seg-btn {
+  flex:1; padding:8px; border-radius:10px; border:1.5px solid var(--border);
+  font-size:13px; font-family:inherit; cursor:pointer; background:none; color:var(--text2);
+  transition:all .15s;
+}
+.sheet-seg-btn.on { background:var(--text); color:var(--bg); border-color:var(--text); font-weight:600; }
+
+/* memo detail */
+.detail-screen {
+  position:fixed; inset:0; background:var(--bg);
+  z-index:150; display:none; flex-direction:column;
+  transform:translateX(100%); transition:transform .25s ease-out;
+}
+.detail-screen.open { display:flex; transform:translateX(0); }
+.detail-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding: calc(var(--safe-top) + 54px) 20px 12px;
+  background:var(--bg);
+}
+.back-btn {
+  display:flex; align-items:center; gap:4px;
+  font-size:16px; color:var(--text2); border:none; background:none;
+  font-family:inherit; cursor:pointer;
+}
+.detail-actions { display:flex; gap:16px; }
+.detail-actions button { font-size:14px; border:none; background:none; font-family:inherit; cursor:pointer; color:var(--text2); }
+.detail-scroll { flex:1; overflow-y:auto; padding:8px 20px 100px; }
+.detail-title { font-size:24px; font-weight:700; letter-spacing:-.5px; margin-bottom:10px; line-height:1.3; }
+.detail-meta { display:flex; align-items:center; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+.detail-body { font-size:15px; line-height:1.8; color:#444; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== MEMO SCREEN ===== -->
+  <div class="screen active" id="screen-memo">
+    <div class="nav-header" style="position:relative">
+      <div class="nav-title">メモ</div>
+      <div class="nav-actions">
+        <button onclick="openMemoEdit(null)" aria-label="新規メモ">✏️</button>
+      </div>
+    </div>
+    <div class="search-wrap">
+      <div class="search-bar">
+        <span>🔍</span>
+        <input id="memo-search" placeholder="検索" oninput="renderMemos()" autocomplete="off" autocorrect="off">
+      </div>
+    </div>
+    <div class="tag-row" id="tag-row"></div>
+    <div class="scroll" id="memo-list"></div>
+  </div>
+
+  <!-- ===== TASK SCREEN ===== -->
+  <div class="screen" id="screen-task">
+    <div class="nav-header"><div class="nav-title">タスク</div></div>
+    <div class="seg-wrap">
+      <div class="seg">
+        <button class="seg-btn on" id="seg-work" onclick="switchCat('work')">💼 仕事</button>
+        <button class="seg-btn"    id="seg-life" onclick="switchCat('life')">🏠 日常</button>
+      </div>
+    </div>
+    <div class="scroll" id="task-list"></div>
+  </div>
+
+  <!-- ===== SETTINGS SCREEN ===== -->
+  <div class="screen" id="screen-settings">
+    <div class="nav-header"><div class="nav-title">設定</div></div>
+    <div class="scroll">
+      <div class="sec-label">今月のゴール</div>
+      <div style="background:var(--bg2);border-radius:16px;overflow:hidden;margin-bottom:8px;">
+        <div onclick="openGoalEdit('work')" style="display:flex;align-items:center;padding:14px 16px;cursor:pointer;border-bottom:1px solid var(--border);">
+          <span style="font-size:15px;margin-right:10px;">💼</span>
+          <span style="font-size:14px;font-weight:500;flex:1;">仕事</span>
+          <span id="goal-work-preview" style="font-size:12px;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+          <span style="color:var(--text3);margin-left:6px;font-size:12px;">›</span>
+        </div>
+        <div onclick="openGoalEdit('life')" style="display:flex;align-items:center;padding:14px 16px;cursor:pointer;">
+          <span style="font-size:15px;margin-right:10px;">🏠</span>
+          <span style="font-size:14px;font-weight:500;flex:1;">日常</span>
+          <span id="goal-life-preview" style="font-size:12px;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+          <span style="color:var(--text3);margin-left:6px;font-size:12px;">›</span>
+        </div>
+      </div>
+      <div class="sec-label">データ</div>
+      <div style="background:var(--bg2);border-radius:16px;overflow:hidden;">
+        <div style="display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border);">
+          <span style="font-size:15px;margin-right:10px;">📝</span>
+          <span style="font-size:14px;flex:1;">メモ</span>
+          <span id="memo-count" style="font-size:13px;color:var(--text3);"></span>
+        </div>
+        <div style="display:flex;align-items:center;padding:14px 16px;">
+          <span style="font-size:15px;margin-right:10px;">✅</span>
+          <span style="font-size:14px;flex:1;">タスク</span>
+          <span id="task-count" style="font-size:13px;color:var(--text3);"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAB -->
+  <button class="fab" id="fab" onclick="onFab()">＋</button>
+
+  <!-- TAB BAR -->
+  <nav class="tab-bar">
+    <button class="tab-item on" id="tab-memo"     onclick="switchTab('memo')">
+      <div class="tab-icon">📝</div><div class="tab-label">メモ</div>
+    </button>
+    <button class="tab-item"    id="tab-task"     onclick="switchTab('task')">
+      <div class="tab-icon">✅</div><div class="tab-label">タスク</div>
+    </button>
+    <button class="tab-item"    id="tab-settings" onclick="switchTab('settings')">
+      <div class="tab-icon">⚙️</div><div class="tab-label">設定</div>
+    </button>
+  </nav>
+</div>
+
+<!-- ===== MEMO DETAIL ===== -->
+<div class="detail-screen" id="memo-detail">
+  <div class="detail-header">
+    <button class="back-btn" onclick="closeDetail()">‹ メモ</button>
+    <div class="detail-actions">
+      <button id="detail-pin-btn"  onclick="detailTogglePin()">📌</button>
+      <button onclick="detailEdit()">編集</button>
+      <button onclick="detailDelete()" style="color:#e03030;">削除</button>
+    </div>
+  </div>
+  <div class="detail-scroll">
+    <div class="detail-title"  id="detail-title"></div>
+    <div class="detail-meta"   id="detail-meta"></div>
+    <div class="detail-body"   id="detail-body"></div>
+  </div>
+</div>
+
+<!-- ===== MEMO EDIT SHEET ===== -->
+<div class="overlay" id="overlay-memo" onclick="sheetBgClick(event,'overlay-memo')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button class="sheet-cancel" onclick="closeSheet('overlay-memo')">キャンセル</button>
+      <span id="memo-sheet-title">新規メモ</span>
+      <button class="sheet-done" id="memo-done-btn" onclick="saveMemo()">完了</button>
+    </div>
+    <div class="sheet-body">
+      <input  class="field-input title" id="memo-title-input" placeholder="タイトル" oninput="checkMemoDone()">
+      <div class="field-label">本文</div>
+      <textarea class="field-textarea" id="memo-body-input"  placeholder="メモを入力..."></textarea>
+      <div class="field-label">タグ</div>
+      <div class="tags-grid" id="memo-tags-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TASK ADD SHEET ===== -->
+<div class="overlay" id="overlay-task" onclick="sheetBgClick(event,'overlay-task')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button class="sheet-cancel" onclick="closeSheet('overlay-task')">キャンセル</button>
+      <span>新規タスク</span>
+      <button class="sheet-done" id="task-done-btn" onclick="saveTask()" disabled>追加</button>
+    </div>
+    <div class="sheet-body">
+      <div class="field-label">タスク名</div>
+      <input class="field-input" id="task-title-input" placeholder="タスクを入力" oninput="checkTaskDone()">
+      <div class="field-label">カテゴリ</div>
+      <div class="sheet-seg">
+        <button class="sheet-seg-btn on" id="tseg-work" onclick="setTaskCat('work')">💼 仕事</button>
+        <button class="sheet-seg-btn"    id="tseg-life" onclick="setTaskCat('life')">🏠 日常</button>
+      </div>
+      <div class="field-label">期間</div>
+      <div class="sheet-seg">
+        <button class="sheet-seg-btn on" id="tperiod-today" onclick="setTaskPeriod('today')">今日</button>
+        <button class="sheet-seg-btn"    id="tperiod-week"  onclick="setTaskPeriod('week')">今週</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== GOAL EDIT SHEET ===== -->
+<div class="overlay" id="overlay-goal" onclick="sheetBgClick(event,'overlay-goal')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button class="sheet-cancel" onclick="closeSheet('overlay-goal')">キャンセル</button>
+      <span id="goal-sheet-title">ゴール編集</span>
+      <button class="sheet-done" onclick="saveGoal()">保存</button>
+    </div>
+    <div class="sheet-body">
+      <div class="field-label">ゴール 1</div>
+      <input class="field-input" id="goal-input-1" placeholder="今月フォーカスすること">
+      <div class="field-label">ゴール 2（任意）</div>
+      <input class="field-input" id="goal-input-2" placeholder="もうひとつあれば">
+      <p style="font-size:12px;color:var(--text3);margin-top:16px;line-height:1.6;">
+        タスク画面の上部に表示され、日々の行動の意識づけになります。
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== STATE =====
+const now = new Date();
+const MONTH = now.getMonth() + 1;
+const YEAR  = now.getFullYear();
+
+let state = load() || {
+  memos: [
+    { id:uid(), title:'Q3 プロダクトロードマップ', body:'新機能の優先順位について。検索強化、タグ機能の改善、オフライン対応...', tags:['仕事'], pinned:true,  at: Date.now()-3600000 },
+    { id:uid(), title:'週次レビューテンプレ', body:'今週よかったこと / 改善したいこと / 来週のフォーカス', tags:['生活'], pinned:true,  at: Date.now()-86400000 },
+    { id:uid(), title:'アプリ名のアイデア',  body:'Leafnote / Memo.flow / Stash / Pebble / Notch...', tags:['アイデア'], pinned:false, at: Date.now()-259200000 },
+    { id:uid(), title:'読みたい本リスト',    body:'ゼロ・トゥ・ワン、ユーザーストーリーマッピング、哲学の世界', tags:['生活'], pinned:false, at: Date.now()-604800000 },
+    { id:uid(), title:'ミーティングメモ',    body:'デザインレビュー。フォントサイズ統一、カラーパレット再検討...', tags:['仕事'], pinned:false, at: Date.now()-1209600000 },
+  ],
+  tasks: [
+    { id:uid(), title:'デザインレビュー資料を仕上げる', cat:'work', period:'today', done:false },
+    { id:uid(), title:'週次レポートを送る',             cat:'work', period:'today', done:false },
+    { id:uid(), title:'朝のスタンドアップ',             cat:'work', period:'today', done:true  },
+    { id:uid(), title:'競合調査まとめ',                 cat:'work', period:'week',  done:false },
+    { id:uid(), title:'仕様書ドラフトをレビュー',       cat:'work', period:'week',  done:false },
+    { id:uid(), title:'朝ランニング 5km',               cat:'life', period:'today', done:true  },
+    { id:uid(), title:'夕食の食材を買う',               cat:'life', period:'today', done:false },
+    { id:uid(), title:'本を30分読む',                   cat:'life', period:'today', done:false },
+    { id:uid(), title:'歯医者の予約を入れる',           cat:'life', period:'week',  done:false },
+    { id:uid(), title:'クローゼットを整理する',         cat:'life', period:'week',  done:false },
+  ],
+  goals: {
+    work: { items:['メモアプリのv1設計を完成させる','チームのOKRをレビューする'] },
+    life: { items:['週3回ランニングを習慣化','本を2冊読む'] },
+  }
+};
+
+// ===== ROUTING =====
+let currentTab = 'memo';
+let currentCat = 'work';
+let selectedTag = null;
+let editingMemoId = null;
+let editingGoalCat = null;
+let detailMemoId = null;
+let taskCat = 'work';
+let taskPeriod = 'today';
+const ALL_TAGS = ['仕事','アイデア','生活','プライベート','読書'];
+
+function uid(){ return Math.random().toString(36).slice(2)+Date.now().toString(36); }
+
+function save(){ try{ localStorage.setItem('memoapp', JSON.stringify(state)); }catch(e){} }
+function load(){ try{ const d=localStorage.getItem('memoapp'); return d?JSON.parse(d):null; }catch(e){ return null; } }
+
+// ===== TABS =====
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('on'));
+  document.getElementById('screen-' + tab).classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('on');
+  if (tab === 'memo')     { renderMemos(); document.getElementById('fab').style.display='flex'; }
+  if (tab === 'task')     { renderTasks(); document.getElementById('fab').style.display='flex'; }
+  if (tab === 'settings') { renderSettings(); document.getElementById('fab').style.display='none'; }
+}
+
+function onFab() {
+  if (currentTab === 'memo') openMemoEdit(null);
+  if (currentTab === 'task') openTaskSheet();
+}
+
+// ===== MEMO RENDER =====
+const TAG_COLORS = { '仕事':'tag-work','アイデア':'tag-idea','生活':'tag-life' };
+function tagClass(t){ return TAG_COLORS[t] || 'tag-other'; }
+
+function fmtDate(ms) {
+  const d = new Date(ms), cal = new Date();
+  if (d.toDateString() === cal.toDateString()) return `今日 ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+  cal.setDate(cal.getDate()-1);
+  if (d.toDateString() === cal.toDateString()) return '昨日';
+  return `${d.getMonth()+1}/${d.getDate()}`;
+}
+
+function renderMemos() {
+  const q = document.getElementById('memo-search').value.toLowerCase();
+  let list = state.memos.filter(m =>
+    (!q || m.title.toLowerCase().includes(q) || m.body.toLowerCase().includes(q) || m.tags.join('').includes(q)) &&
+    (!selectedTag || m.tags.includes(selectedTag))
+  );
+
+  // Tag filter row
+  const allTags = [...new Set(state.memos.flatMap(m => m.tags))].sort();
+  const tr = document.getElementById('tag-row');
+  tr.innerHTML = chipHTML('すべて', selectedTag === null, `filterTag(null)`);
+  allTags.forEach(t => {
+    tr.innerHTML += chipHTML(t, selectedTag === t, `filterTag('${t}')`);
+  });
+
+  const pinned   = list.filter(m => m.pinned);
+  const unpinned = list.filter(m => !m.pinned);
+  const el = document.getElementById('memo-list');
+  let html = '';
+
+  if (pinned.length) {
+    html += `<div class="sec-label">ピン留め</div>`;
+    html += pinned.map(memoCardHTML).join('');
+  }
+  if (unpinned.length) {
+    if (pinned.length) html += `<div class="sec-label">すべて</div>`;
+    html += unpinned.map(memoCardHTML).join('');
+  }
+  if (!list.length) html = `<div class="empty"><div class="empty-icon">📝</div><div class="empty-text">メモがありません</div></div>`;
+  el.innerHTML = html;
+
+  // stats
+  document.getElementById('memo-count') && (document.getElementById('memo-count').textContent = state.memos.length + '件');
+}
+
+function chipHTML(label, on, onclick) {
+  return `<button class="chip ${on?'on':'off'}" onclick="${onclick}">${label}</button>`;
+}
+
+function memoCardHTML(m) {
+  const tag = m.tags[0];
+  return `<div class="memo-card-wrap" id="mwrap-${m.id}">
+    <div class="memo-delete-bg">🗑 削除</div>
+    <div class="memo-card ${m.pinned?'pinned':''}" id="mrow-${m.id}"
+      data-id="${m.id}"
+      onclick="openDetail('${m.id}')"
+      ontouchstart="memoSwipeStart(event,this)"
+      ontouchmove="memoSwipeMove(event,this)"
+      ontouchend="memoSwipeEnd(event,this)">
+      <div class="memo-card-title">${esc(m.title||'無題')}${m.pinned?'<span class="pin-icon">📍</span>':''}</div>
+      ${m.body ? `<div class="memo-card-body">${esc(m.body)}</div>` : ''}
+      <div class="memo-card-footer">
+        <span class="memo-date">${fmtDate(m.at)}</span>
+        ${tag ? `<span class="tag-badge ${tagClass(tag)}">${esc(tag)}</span>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+function deleteMemo(id) {
+  const wrap = document.getElementById('mwrap-'+id);
+  if (wrap) {
+    wrap.style.transition = 'opacity .2s, max-height .25s';
+    wrap.style.opacity = '0';
+    wrap.style.maxHeight = '0';
+    wrap.style.overflow = 'hidden';
+  }
+  setTimeout(() => {
+    state.memos = state.memos.filter(m => m.id !== id);
+    save(); renderMemos();
+  }, 260);
+}
+
+let memoSwipeStartX = 0;
+function memoSwipeStart(e, el) {
+  memoSwipeStartX = e.touches[0].clientX;
+  el.style.transition = 'none';
+}
+function memoSwipeMove(e, el) {
+  const dx = e.touches[0].clientX - memoSwipeStartX;
+  if (dx < 0) el.style.transform = `translateX(${Math.max(dx, -120)}px)`;
+}
+function memoSwipeEnd(e, el) {
+  const dx = e.changedTouches[0].clientX - memoSwipeStartX;
+  el.style.transition = 'transform .2s ease';
+  if (dx < -80) {
+    el.style.transform = 'translateX(-100%)';
+    setTimeout(() => deleteMemo(el.dataset.id), 200);
+  } else {
+    el.style.transform = 'translateX(0)';
+  }
+}
+
+function filterTag(t) { selectedTag = t; renderMemos(); }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ===== MEMO DETAIL =====
+function openDetail(id) {
+  detailMemoId = id;
+  const m = state.memos.find(x => x.id === id);
+  if (!m) return;
+  document.getElementById('detail-title').textContent = m.title || '無題';
+  document.getElementById('detail-pin-btn').textContent = m.pinned ? '📌' : '📍';
+  const meta = document.getElementById('detail-meta');
+  meta.innerHTML = `<span style="font-size:11px;color:var(--text3)">${fmtDate(m.at)}</span>`;
+  m.tags.forEach(t => { meta.innerHTML += `<span class="tag-badge ${tagClass(t)}">${esc(t)}</span>`; });
+  document.getElementById('detail-body').textContent = m.body || '';
+  const d = document.getElementById('memo-detail');
+  d.style.display = 'flex';
+  requestAnimationFrame(() => d.classList.add('open'));
+}
+
+function closeDetail() {
+  const d = document.getElementById('memo-detail');
+  d.classList.remove('open');
+  setTimeout(() => { d.style.display='none'; }, 250);
+}
+
+function detailTogglePin() {
+  const m = state.memos.find(x => x.id === detailMemoId);
+  if (!m) return;
+  m.pinned = !m.pinned;
+  save();
+  openDetail(detailMemoId);
+  renderMemos();
+}
+
+function detailEdit() { closeDetail(); setTimeout(() => openMemoEdit(detailMemoId), 260); }
+
+function detailDelete() {
+  if (!confirm('このメモを削除しますか？')) return;
+  state.memos = state.memos.filter(m => m.id !== detailMemoId);
+  save(); closeDetail(); renderMemos();
+}
+
+// ===== MEMO EDIT =====
+function openMemoEdit(id) {
+  editingMemoId = id;
+  const m = id ? state.memos.find(x => x.id === id) : null;
+  document.getElementById('memo-sheet-title').textContent = m ? '編集' : '新規メモ';
+  document.getElementById('memo-title-input').value = m ? m.title : '';
+  document.getElementById('memo-body-input').value  = m ? m.body  : '';
+
+  const sel = new Set(m ? m.tags : []);
+  const grid = document.getElementById('memo-tags-grid');
+  grid.innerHTML = ALL_TAGS.map(t =>
+    `<button class="chip ${sel.has(t)?'on':'off'}" onclick="toggleMemoTag(this,'${t}')">${t}</button>`
+  ).join('');
+
+  checkMemoDone();
+  openSheet('overlay-memo');
+  setTimeout(() => document.getElementById('memo-title-input').focus(), 350);
+}
+
+function toggleMemoTag(btn, tag) {
+  btn.classList.toggle('on');
+  btn.classList.toggle('off');
+}
+
+function checkMemoDone() {
+  const t = document.getElementById('memo-title-input').value.trim();
+  const b = document.getElementById('memo-body-input').value.trim();
+  document.getElementById('memo-done-btn').disabled = (!t && !b);
+}
+
+function saveMemo() {
+  const title = document.getElementById('memo-title-input').value.trim();
+  const body  = document.getElementById('memo-body-input').value.trim();
+  const tags  = [...document.querySelectorAll('#memo-tags-grid .chip.on')].map(b => b.textContent);
+  if (!title && !body) return;
+
+  if (editingMemoId) {
+    const m = state.memos.find(x => x.id === editingMemoId);
+    if (m) { m.title=title; m.body=body; m.tags=tags; m.at=Date.now(); }
+  } else {
+    state.memos.unshift({ id:uid(), title, body, tags, pinned:false, at:Date.now() });
+  }
+  save(); closeSheet('overlay-memo'); renderMemos();
+}
+
+// ===== TASK RENDER =====
+function switchCat(cat) {
+  currentCat = cat;
+  ['work','life'].forEach(c => {
+    document.getElementById('seg-'+c).classList.toggle('on', c===cat);
+  });
+  renderTasks();
+}
+
+function renderTasks() {
+  const el = document.getElementById('task-list');
+  const goal = state.goals[currentCat];
+  const daysLeft = new Date(YEAR, MONTH, 0).getDate() - now.getDate() + 1;
+  const isWork = currentCat === 'work';
+
+  let html = `<div class="goal-card ${currentCat}">
+    <div class="goal-month">${MONTH}月のフォーカス</div>
+    <div class="goal-items">${goal.items.map(i=>`• ${esc(i)}`).join('<br>')}</div>
+    <div class="goal-days">📅 残り${daysLeft}日</div>
+  </div>`;
+
+  const todayTasks = state.tasks.filter(t => t.cat===currentCat && t.period==='today');
+  const weekTasks  = state.tasks.filter(t => t.cat===currentCat && t.period==='week');
+
+  if (todayTasks.length) {
+    html += `<div class="sec-label">今日</div>`;
+    html += todayTasks.map(taskRowHTML).join('');
+  }
+  if (weekTasks.length) {
+    html += `<div class="sec-label" style="margin-top:8px">今週</div>`;
+    html += weekTasks.map(taskRowHTML).join('');
+  }
+  if (!todayTasks.length && !weekTasks.length) {
+    html += `<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">タスクがありません</div></div>`;
+  }
+  el.innerHTML = html;
+  document.getElementById('task-count') && (document.getElementById('task-count').textContent = state.tasks.length + '件');
+}
+
+function taskRowHTML(t) {
+  return `<div class="task-row-wrap" id="wrap-${t.id}">
+    <div class="task-delete-bg">🗑 削除</div>
+    <div class="task-row" id="row-${t.id}"
+      data-id="${t.id}"
+      ontouchstart="swipeStart(event,this)"
+      ontouchmove="swipeMove(event,this)"
+      ontouchend="swipeEnd(event,this)">
+      <div class="task-check ${t.done?'done':''}" onclick="toggleTask('${t.id}')"></div>
+      <div class="task-label ${t.done?'done':''}">${esc(t.title)}</div>
+    </div>
+  </div>`;
+}
+
+function toggleTask(id) {
+  const t = state.tasks.find(x => x.id===id);
+  if (t) { t.done = !t.done; save(); renderTasks(); }
+}
+
+function deleteTask(id) {
+  const wrap = document.getElementById('wrap-'+id);
+  if (wrap) {
+    wrap.style.transition = 'opacity .2s, max-height .25s';
+    wrap.style.opacity = '0';
+    wrap.style.maxHeight = '0';
+    wrap.style.marginBottom = '0';
+    wrap.style.overflow = 'hidden';
+  }
+  setTimeout(() => {
+    state.tasks = state.tasks.filter(x => x.id !== id);
+    save(); renderTasks();
+  }, 260);
+}
+
+// Swipe to delete
+let swipeStartX = 0;
+const SWIPE_THRESHOLD = 80;
+
+function swipeStart(e, el) {
+  swipeStartX = e.touches[0].clientX;
+  el.style.transition = 'none';
+}
+
+function swipeMove(e, el) {
+  const dx = e.touches[0].clientX - swipeStartX;
+  if (dx < 0) el.style.transform = `translateX(${Math.max(dx, -120)}px)`;
+}
+
+function swipeEnd(e, el) {
+  const dx = e.changedTouches[0].clientX - swipeStartX;
+  el.style.transition = 'transform .2s ease';
+  if (dx < -SWIPE_THRESHOLD) {
+    el.style.transform = 'translateX(-100%)';
+    setTimeout(() => deleteTask(el.dataset.id), 200);
+  } else {
+    el.style.transform = 'translateX(0)';
+  }
+}
+
+// ===== TASK ADD =====
+function openTaskSheet() {
+  taskCat    = currentCat;
+  taskPeriod = 'today';
+  document.getElementById('task-title-input').value = '';
+  ['work','life'].forEach(c => document.getElementById('tseg-'+c).classList.toggle('on', c===taskCat));
+  ['today','week'].forEach(p => document.getElementById('tperiod-'+p).classList.toggle('on', p===taskPeriod));
+  document.getElementById('task-done-btn').disabled = true;
+  openSheet('overlay-task');
+  setTimeout(() => document.getElementById('task-title-input').focus(), 350);
+}
+
+function setTaskCat(c) {
+  taskCat = c;
+  ['work','life'].forEach(x => document.getElementById('tseg-'+x).classList.toggle('on', x===c));
+}
+function setTaskPeriod(p) {
+  taskPeriod = p;
+  ['today','week'].forEach(x => document.getElementById('tperiod-'+x).classList.toggle('on', x===p));
+}
+function checkTaskDone() {
+  document.getElementById('task-done-btn').disabled = !document.getElementById('task-title-input').value.trim();
+}
+function saveTask() {
+  const title = document.getElementById('task-title-input').value.trim();
+  if (!title) return;
+  state.tasks.unshift({ id:uid(), title, cat:taskCat, period:taskPeriod, done:false });
+  save(); closeSheet('overlay-task'); renderTasks();
+}
+
+// ===== GOAL EDIT =====
+function openGoalEdit(cat) {
+  editingGoalCat = cat;
+  document.getElementById('goal-sheet-title').textContent = (cat==='work'?'仕事':'日常') + 'のゴール';
+  const g = state.goals[cat].items;
+  document.getElementById('goal-input-1').value = g[0] || '';
+  document.getElementById('goal-input-2').value = g[1] || '';
+  openSheet('overlay-goal');
+}
+function saveGoal() {
+  const i1 = document.getElementById('goal-input-1').value.trim();
+  const i2 = document.getElementById('goal-input-2').value.trim();
+  state.goals[editingGoalCat].items = i2 ? [i1,i2] : [i1];
+  save(); closeSheet('overlay-goal'); renderSettings();
+  if (currentTab==='task') renderTasks();
+}
+
+// ===== SETTINGS =====
+function renderSettings() {
+  const wg = state.goals.work.items[0] || '';
+  const lg = state.goals.life.items[0] || '';
+  document.getElementById('goal-work-preview').textContent = wg;
+  document.getElementById('goal-life-preview').textContent = lg;
+  document.getElementById('memo-count') && (document.getElementById('memo-count').textContent = state.memos.length+'件');
+  document.getElementById('task-count') && (document.getElementById('task-count').textContent = state.tasks.length+'件');
+}
+
+// ===== SHEET HELPERS =====
+function openSheet(id)  { document.getElementById(id).classList.add('open'); }
+function closeSheet(id) { document.getElementById(id).classList.remove('open'); }
+function sheetBgClick(e, id) { if (e.target.id === id) closeSheet(id); }
+
+// ===== INIT =====
+renderMemos();
+renderTasks();
+renderSettings();
+
+// URLパラメータ ?action=add-task でタスク追加シートを自動表示
+(function() {
+  const params = new URLSearchParams(location.search);
+  if (params.get('action') === 'add-task') {
+    const cat = params.get('cat'); // work or life (省略可)
+    switchTab('task');
+    if (cat === 'work' || cat === 'life') switchCat(cat);
+    setTimeout(() => openTaskSheet(), 400);
+    // 再読み込み時に再度開かないようURLをクリーン
+    history.replaceState(null, '', location.pathname);
+  }
+})();
+
+// Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
