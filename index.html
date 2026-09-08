@@ -322,6 +322,18 @@ body.ios-light{--bg:#f2f2f7;--bg2:#fff;--bg3:#e5e5ea;--text:#000;--text2:#3c3c43
 .v2-overdue{color:var(--ios-red);font-weight:600}
 .v2-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .v2-input{width:100%;border:none;border-bottom:1.5px solid var(--border);padding:8px 0;background:none;outline:none}
+
+/* === v3 usability fixes === */
+.history-sheet{max-height:82vh}
+.history-list{display:flex;flex-direction:column;gap:8px;padding:4px 0 8px}
+.history-item{background:var(--bg3);border-radius:12px;padding:12px 13px}
+.history-item-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.history-item-date{font-size:11px;color:var(--text3)}
+.history-item-title{font-size:15px;font-weight:650;margin-top:4px}
+.history-item-body{font-size:12px;color:var(--text2);line-height:1.45;margin-top:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.history-restore{border:0;background:var(--ios-blue);color:#fff;border-radius:9px;padding:7px 10px;font-size:12px;flex:0 0 auto}
+#v3-task-delete{width:100%;border:0;background:transparent;color:var(--ios-red);font-size:15px;padding:14px 0;margin-top:12px}
+.task-label{cursor:pointer}
 </style>
 </head>
 <body>
@@ -1068,6 +1080,112 @@ if ('serviceWorker' in navigator) {
    save();openDetail(id);renderMemos();
  };
  save();
+})();
+</script><script>
+(function(){
+  if(window.__memoV3Loaded)return; window.__memoV3Loaded=true;
+
+  // ----- Memo history: replace prompt UI with a tappable sheet -----
+  function ensureHistoryOverlay(){
+    if(document.getElementById('history-overlay'))return;
+    var o=document.createElement('div');
+    o.className='overlay'; o.id='history-overlay';
+    o.innerHTML='<div class="sheet history-sheet"><div class="sheet-handle"></div><div class="sheet-header"><button class="sheet-cancel" onclick="closeSheet(\'history-overlay\')">閉じる</button><span>編集履歴</span><span style="width:42px"></span></div><div class="sheet-body"><div class="note">過去の版を選ぶと、その内容へ戻せます。現在の内容も履歴に残るので、戻したあとで元に戻すこともできます。</div><div id="history-list" class="history-list"></div></div></div>';
+    o.addEventListener('click',function(e){if(e.target===o)closeSheet('history-overlay')});
+    document.body.appendChild(o);
+  }
+  window.openMemoHistory=function(id){
+    ensureHistoryOverlay();
+    var m=state.memos.find(function(x){return x.id===id});
+    if(!m||!m.history||!m.history.length)return alert('まだ編集履歴がありません');
+    var list=document.getElementById('history-list');
+    list.innerHTML=m.history.map(function(h,i){
+      var d=new Date(h.savedAt||Date.now()).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      return '<div class="history-item"><div class="history-item-head"><div><div class="history-item-date">'+d+'</div><div class="history-item-title">'+esc(h.title||'無題')+'</div></div><button class="history-restore" onclick="restoreMemoHistory(\''+id+'\','+i+')">この版に戻す</button></div>'+(h.body?'<div class="history-item-body">'+esc(h.body)+'</div>':'')+'</div>';
+    }).join('');
+    openSheet('history-overlay');
+  };
+  window.restoreMemoHistory=function(id,idx){
+    var m=state.memos.find(function(x){return x.id===id}); if(!m||!m.history||!m.history[idx])return;
+    var h=m.history[idx];
+    if(!confirm('この内容に戻しますか？'))return;
+    m.history.unshift({title:m.title||'',body:m.body||'',tags:[...(m.tags||[])],savedAt:m.updatedAt||m.at||Date.now()});
+    m.title=h.title||''; m.body=h.body||''; m.tags=[...(h.tags||[])]; m.updatedAt=Date.now(); m.at=m.updatedAt;
+    save(); closeSheet('history-overlay'); openDetail(id); renderMemos();
+  };
+
+  // ----- Task editing -----
+  window.v3EditingTaskId=null;
+
+  function taskEditorTitle(text){
+    var span=document.querySelector('#overlay-task .sheet-header span');
+    if(span)span.textContent=text;
+  }
+  function ensureTaskDelete(){
+    var body=document.querySelector('#overlay-task .sheet-body'); if(!body)return;
+    var b=document.getElementById('v3-task-delete');
+    if(!b){b=document.createElement('button');b.id='v3-task-delete';b.textContent='このタスクを削除';b.onclick=function(){if(v3EditingTaskId)deleteTaskFromEditor(v3EditingTaskId)};body.appendChild(b)}
+    b.style.display=v3EditingTaskId?'block':'none';
+  }
+
+  var previousOpenTaskSheet=openTaskSheet;
+  openTaskSheet=function(){
+    v3EditingTaskId=null;
+    previousOpenTaskSheet();
+    taskEditorTitle('新規タスク');
+    ensureTaskDelete();
+  };
+
+  window.openTaskForEdit=function(id){
+    var t=state.tasks.find(function(x){return x.id===id}); if(!t)return;
+    v3EditingTaskId=id;
+    // Use the existing sheet setup first, then overwrite with task values.
+    previousOpenTaskSheet();
+    v3EditingTaskId=id;
+    taskEditorTitle('タスクを編集');
+    document.getElementById('task-title-input').value=t.title||'';
+    taskCat=t.cat||'work';
+    ['work','life'].forEach(function(c){var x=document.getElementById('tseg-'+c);if(x)x.classList.toggle('on',c===taskCat)});
+    taskPeriod=t.period||'today';
+    ['today','week'].forEach(function(p){var x=document.getElementById('tperiod-'+p);if(x)x.classList.toggle('on',p===taskPeriod)});
+    var due=document.getElementById('task-due-input'); if(due)due.value=t.due||'';
+    var repeat=document.getElementById('task-repeat-input'); if(repeat)repeat.value=t.repeat||'none';
+    var done=document.getElementById('task-done-btn'); if(done){done.disabled=false;done.textContent='保存'}
+    ensureTaskDelete();
+  };
+
+  var previousSaveTask=saveTask;
+  saveTask=function(){
+    if(!v3EditingTaskId){previousSaveTask();return}
+    var t=state.tasks.find(function(x){return x.id===v3EditingTaskId}); if(!t)return;
+    var title=document.getElementById('task-title-input').value.trim(); if(!title)return;
+    t.title=title; t.cat=taskCat; t.period=taskPeriod;
+    var due=document.getElementById('task-due-input'); if(due)t.due=due.value||'';
+    var repeat=document.getElementById('task-repeat-input'); if(repeat)t.repeat=repeat.value||'none';
+    save(); closeSheet('overlay-task'); v3EditingTaskId=null; renderTasks();
+  };
+
+  window.deleteTaskFromEditor=function(id){
+    var t=state.tasks.find(function(x){return x.id===id}); if(!t)return;
+    if(!confirm('「'+t.title+'」を削除しますか？'))return;
+    state.tasks=state.tasks.filter(function(x){return x.id!==id});
+    save(); closeSheet('overlay-task'); v3EditingTaskId=null; renderTasks();
+  };
+
+  var previousRenderTasks=renderTasks;
+  renderTasks=function(){
+    previousRenderTasks();
+    document.querySelectorAll('#task-list .task-row').forEach(function(row){
+      var id=(row.id||'').replace(/^row-/,'');
+      var label=row.querySelector('.task-label');
+      if(label){
+        label.onclick=function(e){e.stopPropagation();openTaskForEdit(id)};
+        label.title='クリックして編集';
+      }
+    });
+  };
+
+  renderTasks();
 })();
 </script></body>
 </html>
