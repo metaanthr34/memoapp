@@ -288,6 +288,40 @@ html, body {
 .detail-title { font-size:24px; font-weight:700; letter-spacing:-.5px; margin-bottom:10px; line-height:1.3; }
 .detail-meta { display:flex; align-items:center; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
 .detail-body { font-size:15px; line-height:1.8; color:#444; white-space:pre-wrap; }
+
+/* === v2 iOS-style enhancement layer === */
+:root{--ios-blue:#007aff;--ios-red:#ff3b30;--ios-group:#f2f2f7}
+html,body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif}
+body.ios-dark{--bg:#000;--bg2:#1c1c1e;--bg3:#2c2c2e;--text:#fff;--text2:#ebebf5;--text3:#8e8e93;--border:#3a3a3c}
+body.ios-light{--bg:#f2f2f7;--bg2:#fff;--bg3:#e5e5ea;--text:#000;--text2:#3c3c43;--text3:#8e8e93;--border:#d1d1d6}
+.nav-title{font-size:34px;font-weight:750;letter-spacing:-1px}
+.nav-header{padding-top:calc(var(--safe-top) + 28px)}
+.nav-actions button,.sheet-done,.back-btn,.detail-actions button{color:var(--ios-blue)}
+.search-bar{border-radius:10px;background:var(--bg3)}
+.memo-card,.task-row,.goal-card{box-shadow:0 1px 2px rgba(0,0,0,.04),0 6px 20px rgba(0,0,0,.04)}
+.memo-card{border-radius:14px}.task-row{border-radius:12px}
+.fab{background:var(--ios-blue);color:#fff}
+.tab-item.on .tab-label{color:var(--ios-blue)}
+.v2-sort{margin-left:auto;border:0;background:var(--bg2);color:var(--text2);border-radius:18px;padding:6px 10px;font-size:12px}
+.v2-settings-group{background:var(--bg2);border-radius:14px;overflow:hidden;margin-bottom:10px}
+.v2-setting-row{display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid var(--border);font-size:14px}
+.v2-setting-row:last-child{border-bottom:0}
+.v2-setting-row .grow{flex:1}.v2-setting-row small{display:block;color:var(--text3);margin-top:2px}
+.v2-setting-row select,.v2-setting-row button{border:0;background:var(--bg3);border-radius:9px;padding:7px 9px}
+.v2-link{color:var(--ios-blue)!important;background:none!important;text-align:left}
+.v2-tag-list{display:flex;gap:7px;flex-wrap:wrap;padding:12px 15px}
+.v2-tag-edit{border:0;border-radius:999px;padding:6px 10px;background:var(--bg3)}
+#memo-list.v2-compact .memo-card-body{display:none}
+#memo-list.v2-compact .memo-card{padding-top:11px;padding-bottom:11px}
+#memo-list.v2-detail .memo-card-body{-webkit-line-clamp:5}
+#overlay-memo .sheet{height:100vh;max-height:100vh;border-radius:0;padding-top:var(--safe-top)}
+#overlay-memo .sheet-handle{display:none}
+#memo-body-input{min-height:48vh;font-size:17px;line-height:1.7}
+.v2-editor-meta{display:flex;justify-content:space-between;color:var(--text3);font-size:11px;padding-top:6px}
+.v2-task-meta{font-size:10px;color:var(--text3);margin-top:4px}
+.v2-overdue{color:var(--ios-red);font-weight:600}
+.v2-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.v2-input{width:100%;border:none;border-bottom:1.5px solid var(--border);padding:8px 0;background:none;outline:none}
 </style>
 </head>
 <body>
@@ -898,5 +932,101 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 </script>
-</body>
+<script>
+(function(){
+  if(window.__memoV2Loaded)return; window.__memoV2Loaded=true;
+  var oldSave=save;
+  function ensureV2(){
+    state.settings=Object.assign({theme:'system',memoSort:'updated-desc',density:'standard'},state.settings||{});
+    state.tags=Array.isArray(state.tags)&&state.tags.length?state.tags:Array.from(new Set(state.memos.reduce(function(a,m){return a.concat(m.tags||[])},[]).concat(['仕事','アイデア','生活'])));
+    state.memos.forEach(function(m,i){m.createdAt=m.createdAt||m.at||Date.now()-i;m.updatedAt=m.updatedAt||m.at||Date.now()-i});
+    state.tasks.forEach(function(t){t.due=t.due||'';t.repeat=t.repeat||'none';t.createdAt=t.createdAt||Date.now()});
+    oldSave();
+  }
+  ensureV2();
+
+  function applyThemeV2(){
+    var pref=state.settings.theme||'system';
+    var dark=pref==='dark'||(pref==='system'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
+    document.body.classList.toggle('ios-dark',dark);document.body.classList.toggle('ios-light',!dark);
+    var meta=document.querySelector('meta[name=theme-color]');if(meta)meta.content=dark?'#000000':'#f2f2f7';
+  }
+  applyThemeV2();
+  if(window.matchMedia)matchMedia('(prefers-color-scheme: dark)').addEventListener&&matchMedia('(prefers-color-scheme: dark)').addEventListener('change',function(){if(state.settings.theme==='system')applyThemeV2()});
+
+  var baseRenderMemos=renderMemos;
+  renderMemos=function(){
+    baseRenderMemos();
+    var list=document.getElementById('memo-list');if(!list)return;
+    list.classList.remove('v2-compact','v2-detail');if(state.settings.density==='compact')list.classList.add('v2-compact');if(state.settings.density==='detail')list.classList.add('v2-detail');
+    var cards=Array.from(list.querySelectorAll('.memo-card-wrap'));
+    cards.sort(function(a,b){
+      var ma=state.memos.find(function(m){return a.id==='mwrap-'+m.id}),mb=state.memos.find(function(m){return b.id==='mwrap-'+m.id});
+      if(!ma||!mb)return 0;if(ma.pinned!==mb.pinned)return ma.pinned?-1:1;
+      var mode=state.settings.memoSort;
+      if(mode==='updated-asc')return ma.updatedAt-mb.updatedAt;
+      if(mode==='created-desc')return mb.createdAt-ma.createdAt;
+      if(mode==='title')return (ma.title||'').localeCompare(mb.title||'','ja');
+      return mb.updatedAt-ma.updatedAt;
+    });
+    cards.forEach(function(c){list.appendChild(c)});
+    var tr=document.getElementById('tag-row');
+    if(tr&&!document.getElementById('v2-sort')){
+      var sel=document.createElement('select');sel.id='v2-sort';sel.className='v2-sort';
+      [['updated-desc','更新順'],['updated-asc','古い更新順'],['created-desc','作成順'],['title','タイトル順']].forEach(function(x){var o=document.createElement('option');o.value=x[0];o.textContent=x[1];sel.appendChild(o)});
+      sel.value=state.settings.memoSort;sel.onchange=function(){state.settings.memoSort=this.value;oldSave();renderMemos()};tr.appendChild(sel);
+    }
+  };
+
+  var baseOpenMemo=openMemoEdit;
+  openMemoEdit=function(id){
+    baseOpenMemo(id);
+    var m=id?state.memos.find(function(x){return x.id===id}):null;
+    var grid=document.getElementById('memo-tags-grid');
+    if(grid)grid.innerHTML=state.tags.map(function(t){return '<button class="chip '+((m&&m.tags||[]).indexOf(t)>=0?'on':'off')+'" onclick="toggleMemoTag(this,\''+t.replace(/'/g,'&#39;')+'\')">'+esc(t)+'</button>'}).join('');
+    var body=document.getElementById('memo-body-input');
+    if(body&&!document.getElementById('v2-editor-meta')){var d=document.createElement('div');d.id='v2-editor-meta';d.className='v2-editor-meta';d.innerHTML='<span id="v2-char-count">0文字</span><span>自動下書き保存</span>';body.insertAdjacentElement('afterend',d)}
+    if(!id){try{var dr=JSON.parse(localStorage.getItem('memoapp_draft_v2')||'null');if(dr&&(dr.title||dr.body)&&Date.now()-dr.at<604800000){document.getElementById('memo-title-input').value=dr.title||'';body.value=dr.body||''}}catch(e){}}
+    updateV2Count();
+  };
+  function updateV2Count(){var b=document.getElementById('memo-body-input'),c=document.getElementById('v2-char-count');if(b&&c)c.textContent=b.value.length+'文字'}
+  document.addEventListener('input',function(e){if(e.target&&e.target.id==='memo-body-input'){updateV2Count();if(!editingMemoId)localStorage.setItem('memoapp_draft_v2',JSON.stringify({title:document.getElementById('memo-title-input').value,body:e.target.value,at:Date.now()}))}});
+  var baseSaveMemo=saveMemo;
+  saveMemo=function(){var id=editingMemoId;baseSaveMemo();if(!id)localStorage.removeItem('memoapp_draft_v2');var m=id&&state.memos.find(function(x){return x.id===id});if(m)m.updatedAt=Date.now();else if(state.memos[0]){state.memos[0].createdAt=state.memos[0].createdAt||Date.now();state.memos[0].updatedAt=Date.now()}oldSave()};
+
+  function addTaskFields(){
+    var body=document.querySelector('#overlay-task .sheet-body');if(!body||document.getElementById('task-due-input'))return;
+    var box=document.createElement('div');box.innerHTML='<div class="v2-grid"><div><div class="field-label">期限</div><input id="task-due-input" class="v2-input" type="date"></div><div><div class="field-label">繰り返し</div><select id="task-repeat-input" class="v2-input"><option value="none">なし</option><option value="daily">毎日</option><option value="weekly">毎週</option><option value="monthly">毎月</option></select></div></div>';
+    body.appendChild(box);
+  } addTaskFields();
+  var baseOpenTask=openTaskSheet;
+  openTaskSheet=function(){baseOpenTask();addTaskFields();document.getElementById('task-due-input').value='';document.getElementById('task-repeat-input').value='none'};
+  var baseSaveTask=saveTask;
+  saveTask=function(){var before=state.tasks.length;baseSaveTask();if(state.tasks.length>before){state.tasks[0].due=document.getElementById('task-due-input').value||'';state.tasks[0].repeat=document.getElementById('task-repeat-input').value||'none';state.tasks[0].createdAt=Date.now();oldSave();renderTasks()}};
+  var oldTaskRow=taskRowHTML;
+  taskRowHTML=function(t){var html=oldTaskRow(t);var extra=[];if(t.due){var overdue=!t.done&&t.due<new Date().toISOString().slice(0,10);extra.push('<span class="'+(overdue?'v2-overdue':'')+'">期限 '+t.due.replace(/^[0-9]{4}-/,'').replace('-','/')+'</span>')}if(t.repeat&&t.repeat!=='none')extra.push('↻ '+({daily:'毎日',weekly:'毎週',monthly:'毎月'}[t.repeat]||''));if(extra.length)html=html.replace('</div>\n    </div>\n  </div>','<div class="v2-task-meta">'+extra.join('　')+'</div></div>\n    </div>\n  </div>');return html};
+  var oldToggle=toggleTask;
+  toggleTask=function(id){var t=state.tasks.find(function(x){return x.id===id});if(t&&!t.done&&t.repeat&&t.repeat!=='none'){t.done=true;var d=t.due||new Date().toISOString().slice(0,10),x=new Date(d+'T00:00:00');if(t.repeat==='daily')x.setDate(x.getDate()+1);if(t.repeat==='weekly')x.setDate(x.getDate()+7);if(t.repeat==='monthly')x.setMonth(x.getMonth()+1);var nd=x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');state.tasks.unshift(Object.assign({},t,{id:uid(),done:false,due:nd,createdAt:Date.now()}));oldSave();renderTasks()}else oldToggle(id)};
+
+  window.exportMemoBackup=function(){var blob=new Blob([JSON.stringify({version:2,exportedAt:new Date().toISOString(),state:state},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='memoapp-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},500)};
+  window.importMemoBackup=function(inp){var f=inp.files&&inp.files[0];inp.value='';if(!f)return;var r=new FileReader();r.onload=function(){try{var p=JSON.parse(r.result),n=p.state||p;if(!confirm('バックアップから復元しますか？'))return;state=n;ensureV2();applyThemeV2();renderMemos();renderTasks();renderSettings();alert('復元しました')}catch(e){alert('読み込めないバックアップです')}};r.readAsText(f)};
+
+  var baseSettings=renderSettings;
+  renderSettings=function(){
+    baseSettings();
+    var sc=document.querySelector('#screen-settings .scroll');if(!sc)return;
+    var old=document.getElementById('v2-settings');if(old)old.remove();
+    var w=document.createElement('div');w.id='v2-settings';
+    w.innerHTML='<div class="sec-label">表示</div><div class="v2-settings-group"><div class="v2-setting-row"><div class="grow">外観<small>端末設定にも連動</small></div><select id="v2-theme"><option value="system">自動</option><option value="light">ライト</option><option value="dark">ダーク</option></select></div><div class="v2-setting-row"><div class="grow">メモの情報量<small>一覧の本文表示量</small></div><select id="v2-density"><option value="compact">コンパクト</option><option value="standard">標準</option><option value="detail">詳細</option></select></div></div><div class="sec-label">タグ</div><div class="v2-settings-group"><div class="v2-tag-list" id="v2-tag-list"></div><div class="v2-setting-row"><button class="v2-link" onclick="v2AddTag()">＋ タグを追加</button></div></div><div class="sec-label">バックアップ</div><div class="v2-settings-group"><div class="v2-setting-row"><button class="v2-link" onclick="exportMemoBackup()">バックアップを書き出す</button></div><div class="v2-setting-row"><button class="v2-link" onclick="document.getElementById(\'v2-import\').click()">バックアップから復元</button><input id="v2-import" type="file" accept=".json,application/json" style="display:none" onchange="importMemoBackup(this)"></div></div>';
+    sc.appendChild(w);document.getElementById('v2-theme').value=state.settings.theme;document.getElementById('v2-density').value=state.settings.density;
+    document.getElementById('v2-theme').onchange=function(){state.settings.theme=this.value;oldSave();applyThemeV2()};
+    document.getElementById('v2-density').onchange=function(){state.settings.density=this.value;oldSave();renderMemos()};
+    document.getElementById('v2-tag-list').innerHTML=state.tags.map(function(t){return '<button class="v2-tag-edit" onclick="v2EditTag(\''+t.replace(/'/g,'&#39;')+'\')">'+esc(t)+'</button>'}).join('');
+  };
+  window.v2AddTag=function(){var n=prompt('新しいタグ名');if(!n)return;n=n.trim();if(!n||state.tags.indexOf(n)>=0)return;state.tags.push(n);oldSave();renderSettings();renderMemos()};
+  window.v2EditTag=function(old){var n=prompt('タグ名を変更\n空欄で削除',old);if(n===null)return;n=n.trim();if(!n){if(!confirm('タグ「'+old+'」を削除しますか？'))return;state.tags=state.tags.filter(function(t){return t!==old});state.memos.forEach(function(m){m.tags=(m.tags||[]).filter(function(t){return t!==old})})}else{if(n!==old&&state.tags.indexOf(n)>=0)return alert('同名タグがあります');state.tags=state.tags.map(function(t){return t===old?n:t});state.memos.forEach(function(m){m.tags=(m.tags||[]).map(function(t){return t===old?n:t})})}oldSave();renderSettings();renderMemos()};
+
+  renderMemos();renderTasks();renderSettings();
+})();
+</script></body>
 </html>
