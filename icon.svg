@@ -1,8 +1,51 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#1a1a1a"/>
-  <rect x="140" y="160" width="232" height="28" rx="14" fill="#f5f5f0"/>
-  <rect x="140" y="212" width="180" height="20" rx="10" fill="#f5f5f0" opacity="0.6"/>
-  <rect x="140" y="256" width="200" height="20" rx="10" fill="#f5f5f0" opacity="0.6"/>
-  <rect x="140" y="316" width="232" height="28" rx="14" fill="#f5f5f0"/>
-  <rect x="140" y="368" width="140" height="20" rx="10" fill="#f5f5f0" opacity="0.6"/>
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#4a4742"/>
+    <stop offset=".28" stop-color="#263242"/>
+    <stop offset="1" stop-color="#0a0d12"/>
+  </linearGradient>
+  <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#fffdf8"/>
+    <stop offset="1" stop-color="#eee7dc"/>
+  </linearGradient>
+  <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#f6d47a"/>
+    <stop offset=".5" stop-color="#c99635"/>
+    <stop offset="1" stop-color="#f1c65e"/>
+  </linearGradient>
+  <linearGradient id="pen" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#253244"/>
+    <stop offset=".5" stop-color="#0c1320"/>
+    <stop offset="1" stop-color="#34465d"/>
+  </linearGradient>
+  <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+    <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000" flood-opacity=".35"/>
+  </filter>
+  <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+    <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity=".22"/>
+  </filter>
+</defs>
+<rect width="512" height="512" rx="108" fill="url(#bg)"/>
+<circle cx="72" cy="52" r="90" fill="#e4b766" opacity=".12"/>
+<g filter="url(#shadow)">
+  <rect x="110" y="78" width="292" height="286" rx="36" fill="url(#paper)"/>
+  <path d="M352 364h-210c-18 0-32-14-32-32V110c0-18 14-32 32-32h228c18 0 32 14 32 32v204c0 28-22 50-50 50z" fill="url(#paper)"/>
+  <path d="M350 364c28 0 52-22 52-50v-24c-22 0-42 18-42 42 0 12-4 22-10 32z" fill="#dacdb7"/>
+</g>
+<path d="M147 75h48v68l-24-18-24 18z" fill="url(#gold)" filter="url(#soft)"/>
+<g opacity=".55" stroke="#a99f92" stroke-width="8" stroke-linecap="round">
+  <path d="M145 175h190"/><path d="M145 218h166"/><path d="M145 261h140"/><path d="M145 304h105"/>
+</g>
+<g transform="rotate(39 315 225)" filter="url(#soft)">
+  <rect x="288" y="104" width="44" height="230" rx="22" fill="url(#pen)"/>
+  <rect x="288" y="120" width="44" height="10" fill="url(#gold)"/>
+  <rect x="288" y="282" width="44" height="10" fill="url(#gold)"/>
+  <path d="M310 334l-15 34h30z" fill="url(#gold)"/>
+  <path d="M306 368h8l-4 12z" fill="#111"/>
+  <path d="M332 132c22 8 22 28 22 45v56" fill="none" stroke="url(#gold)" stroke-width="7" stroke-linecap="round"/>
+</g>
+<text x="256" y="425" text-anchor="middle" fill="#f7efe3" font-family="-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif" font-size="36" letter-spacing="13">MEMO</text>
+<text x="256" y="457" text-anchor="middle" fill="#b9aa98" font-family="-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif" font-size="9" letter-spacing="5">CAPTURE TODAY</text>
+<text x="256" y="474" text-anchor="middle" fill="#8f8375" font-family="-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif" font-size="8" letter-spacing="4">FOR TOMORROW</text>
 </svg>
