@@ -1,4 +1,4 @@
-const CACHE = 'memoapp-v1';
+const CACHE = 'memoapp-v2';
 const ASSETS = ['./index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {
