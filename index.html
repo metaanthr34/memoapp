@@ -1028,5 +1028,46 @@ if ('serviceWorker' in navigator) {
 
   renderMemos();renderTasks();renderSettings();
 })();
+</script><script>
+(function(){
+ if(window.__memoHistoryLoaded)return;window.__memoHistoryLoaded=true;
+ state.memos.forEach(function(m){if(!Array.isArray(m.history))m.history=[]});
+ var originalSaveMemo=saveMemo;
+ saveMemo=function(){
+   if(editingMemoId){
+     var m=state.memos.find(function(x){return x.id===editingMemoId});
+     if(m){
+       m.history=m.history||[];
+       m.history.unshift({title:m.title||'',body:m.body||'',tags:[...(m.tags||[])],savedAt:m.updatedAt||m.at||Date.now()});
+       if(m.history.length>30)m.history=m.history.slice(0,30);
+     }
+   }
+   originalSaveMemo();
+   save();
+ };
+ var originalOpenDetail=openDetail;
+ openDetail=function(id){
+   originalOpenDetail(id);
+   var m=state.memos.find(function(x){return x.id===id});
+   var actions=document.querySelector('#memo-detail .detail-actions');
+   if(actions){
+     var old=document.getElementById('memo-history-btn'); if(old)old.remove();
+     if(m&&m.history&&m.history.length){
+       var b=document.createElement('button');b.id='memo-history-btn';b.textContent='履歴';b.onclick=function(){openMemoHistory(id)};actions.insertBefore(b,actions.lastElementChild||null);
+     }
+   }
+ };
+ window.openMemoHistory=function(id){
+   var m=state.memos.find(function(x){return x.id===id}); if(!m||!m.history||!m.history.length)return;
+   var lines=m.history.map(function(h,i){var d=new Date(h.savedAt||Date.now());return (i+1)+': '+d.toLocaleString('ja-JP')+'  '+(h.title||'無題')}).join('\n');
+   var pick=prompt('戻したい履歴番号を入力してください\n\n'+lines); if(!pick)return;
+   var idx=Number(pick)-1; if(!Number.isInteger(idx)||idx<0||idx>=m.history.length)return alert('番号が正しくありません');
+   var h=m.history[idx]; if(!confirm('この版を復元しますか？\n現在の内容も履歴に残ります。'))return;
+   m.history.unshift({title:m.title||'',body:m.body||'',tags:[...(m.tags||[])],savedAt:m.updatedAt||Date.now()});
+   m.title=h.title||'';m.body=h.body||'';m.tags=[...(h.tags||[])];m.updatedAt=Date.now();m.at=m.updatedAt;
+   save();openDetail(id);renderMemos();
+ };
+ save();
+})();
 </script></body>
 </html>
